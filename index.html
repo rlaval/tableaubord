@@ -7,13 +7,29 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/>
 <style>
 body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
-.container { max-width: 1200px; margin:auto; }
+#login-container { max-width: 400px; margin:auto; padding:20px; background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.2); text-align:center; }
+#login-container input { margin-bottom:10px; width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; }
+#login-container button { width:100%; padding:10px; border-radius:6px; }
+#login-message { display:block; margin-top:10px; color:red; font-weight:bold; }
+
+.container { max-width: 1200px; margin:auto; display:none; }
 .card { margin-bottom: 20px; }
 .card-header { font-weight:bold; font-size:1.1rem; }
 .icon-preview { width:50px; height:50px; object-fit:contain; }
 </style>
 </head>
 <body>
+
+<!-- ---------------- LOGIN ---------------- -->
+<div id="login-container">
+  <h3>Connexion Tableau de bord</h3>
+  <input type="email" id="login-email" placeholder="Email" />
+  <input type="password" id="login-password" placeholder="Mot de passe" />
+  <button id="login-btn">Se connecter</button>
+  <span id="login-message"></span>
+</div>
+
+<!-- ---------------- TABLEAU DE BORD ---------------- -->
 <div class="container">
 <h1 class="mb-4">Tableau de bord météo Aveyron</h1>
 
@@ -60,6 +76,7 @@ body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
 import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-database.js";
+import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
 
 // ---------------- FIREBASE ----------------
 const firebaseConfig = {
@@ -73,6 +90,28 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const auth = getAuth(app);
+
+// ---------------- LOGIN ----------------
+const loginBtn = document.getElementById('login-btn');
+const loginMessage = document.getElementById('login-message');
+loginBtn.addEventListener('click', () => {
+  const email = document.getElementById('login-email').value;
+  const password = document.getElementById('login-password').value;
+
+  signInWithEmailAndPassword(auth, email, password)
+    .then(userCredential => {
+      loginMessage.innerText = "Connecté !";
+      document.getElementById('login-container').style.display = 'none';
+      document.querySelector('.container').style.display = 'block';
+      adjustDatesIfNeeded(); // Ajuster dates au login
+      renderCities();
+      loadDescription();
+    })
+    .catch(error => {
+      loginMessage.innerText = "Erreur : " + error.message;
+    });
+});
 
 // ---------------- DONNÉES ----------------
 const CONDITIONS = {
@@ -90,28 +129,27 @@ const CITIES = ["Rodez","Millau","Decazeville","Villefranche-de-Rouergue"];
 let currentPeriod = "morning";
 let currentDay = "today";
 
-// ---------------- FONCTION POUR METTRE À JOUR TODAY/TOMORROW AUTOMATIQUEMENT ----------------
+// ---------------- AJUSTER LES DATES À MINUIT ----------------
 async function adjustDatesIfNeeded(){
   const dateRef = ref(db,'dateReference');
   const snap = await get(dateRef);
   const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
   if(!snap.exists() || snap.val()!==todayStr){
-    // Décaler demain → today
+    // Décaler tomorrow → today
     const todayRef = ref(db,'today');
     const tomorrowRef = ref(db,'tomorrow');
     const tomorrowSnap = await get(tomorrowRef);
-    if(tomorrowSnap.exists()){
+    if(tomorrowSnap.exists() && Object.keys(tomorrowSnap.val()).length > 0){
       await set(todayRef, tomorrowSnap.val());
     }
     // Réinitialiser tomorrow vide pour j+1
-    await set(tomorrowRef, {}); // on pourra remplir via tableau de bord
+    await set(tomorrowRef, {});
     await set(dateRef, todayStr);
     console.log("Dates ajustées automatiquement pour le nouveau jour :", todayStr);
   }
 }
-adjustDatesIfNeeded();
 
-// ---------------- FONCTION POUR RENDER LES VILLES ----------------
+// ---------------- RENDER VILLES ----------------
 const container = document.getElementById('cities-container');
 function renderCities(){
  container.innerHTML = '';
@@ -154,7 +192,6 @@ function renderCities(){
   });
  });
 }
-renderCities();
 
 // ---------------- PERIODES ----------------
 document.querySelectorAll('.period-btn').forEach(btn=>{
@@ -180,8 +217,6 @@ function loadDescription(){
  const descRef = ref(db, `descriptions/${currentDay}/${currentPeriod}`);
  onValue(descRef, snap=>{ descTextarea.value = snap.exists()? snap.val() : ''; });
 }
-loadDescription();
-
 document.getElementById('save-description').addEventListener('click',()=>{
  set(ref(db, `descriptions/${currentDay}/${currentPeriod}`), descTextarea.value);
  alert(`Description ${currentPeriod} pour ${currentDay} mise à jour !`);
