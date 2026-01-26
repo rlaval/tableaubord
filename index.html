@@ -67,6 +67,7 @@ body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; 
 <option value="tomorrow">Demain</option>
 </select>
 <button id="update-map" class="btn btn-primary">Mettre à jour la carte</button>
+<span id="current-date" class="ms-3 fw-bold"></span>
 </div>
 </div>
 
@@ -133,6 +134,7 @@ loginBtn.addEventListener('click', () => {
       adjustDatesIfNeeded(); // Ajuster dates au login
       renderCities();
       loadDescription();
+      updateCurrentDate(); // affichage de la date correcte
     })
     .catch(error => {
       loginMessage.innerText = "Erreur : " + error.message;
@@ -186,6 +188,14 @@ async function adjustDatesIfNeeded(){
     await set(dateRef, todayStr);
     console.log("Dates ajustées automatiquement pour le nouveau jour :", todayStr);
   }
+}
+
+// ---------------- AFFICHER LA DATE ----------------
+function updateCurrentDate(){
+  const dateDisplay = document.getElementById('current-date');
+  const baseDate = new Date();
+  if(currentDay==='tomorrow') baseDate.setDate(baseDate.getDate()+1);
+  dateDisplay.innerText = baseDate.toLocaleDateString('fr-FR', { weekday:'long', day:'2-digit', month:'long' });
 }
 
 // ---------------- RENDER VILLES ----------------
@@ -246,6 +256,7 @@ document.querySelectorAll('.period-btn').forEach(btn=>{
 // ---------------- DAY ----------------
 document.getElementById('day-select').addEventListener('change',(e)=>{
  currentDay = e.target.value;
+ updateCurrentDate(); // MAJ date
  renderCities();
  loadDescription();
 });
