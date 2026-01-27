@@ -22,8 +22,6 @@ body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; 
   z-index: 10;
   color: white;
 }
-
-/* Fond flou pour login */
 #login-container::before {
   content: "";
   position: fixed;
@@ -32,7 +30,6 @@ body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; 
   filter: blur(8px) brightness(0.6);
   z-index: -1;
 }
-
 #login-container input { margin-bottom:10px; width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; }
 #login-container button { width:100%; padding:10px; border-radius:6px; }
 #login-message { display:block; margin-top:10px; color:red; font-weight:bold; }
@@ -57,7 +54,7 @@ body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; 
 
 <!-- ---------------- TABLEAU DE BORD ---------------- -->
 <div class="container">
-<h1 class="mb-4">Tableau de bord prévisions - MeteoAveyron - OBserveV1</h1>
+<h1 class="mb-4">Tableau de bord prévisions - MeteoAveyron - OBserveV2</h1>
 
 <div class="card">
 <div class="card-header">Sélection du jour</div>
@@ -122,23 +119,22 @@ const auth = getAuth(app);
 // ---------------- LOGIN ----------------
 const loginBtn = document.getElementById('login-btn');
 const loginMessage = document.getElementById('login-message');
-loginBtn.addEventListener('click', () => {
+loginBtn.addEventListener('click', async () => {
   const email = document.getElementById('login-email').value;
   const password = document.getElementById('login-password').value;
 
-  signInWithEmailAndPassword(auth, email, password)
-    .then(userCredential => {
-      loginMessage.innerText = "Connecté !";
-      document.getElementById('login-container').style.display = 'none';
-      document.querySelector('.container').style.display = 'block';
-      adjustDatesIfNeeded(); // Ajuster dates au login
-      renderCities();
-      loadDescription();
-      updateCurrentDate(); // affichage de la date correcte
-    })
-    .catch(error => {
-      loginMessage.innerText = "Erreur : " + error.message;
-    });
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    loginMessage.innerText = "Connecté !";
+    document.getElementById('login-container').style.display = 'none';
+    document.querySelector('.container').style.display = 'block';
+    await adjustDatesIfNeeded(); 
+    renderCities();
+    loadDescription();
+    updateCurrentDate(); 
+  } catch(error) {
+    loginMessage.innerText = "Erreur : " + error.message;
+  }
 });
 
 // ---------------- DONNÉES ----------------
@@ -174,17 +170,20 @@ let currentDay = "today";
 
 // ---------------- AJUSTER LES DATES À MINUIT ----------------
 async function adjustDatesIfNeeded(){
+  // Simuler la date du jour pour tests : const todayStr = "2026-01-28";
+  const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
   const dateRef = ref(db,'dateReference');
   const snap = await get(dateRef);
-  const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
   if(!snap.exists() || snap.val()!==todayStr){
     const todayRef = ref(db,'today');
     const tomorrowRef = ref(db,'tomorrow');
     const tomorrowSnap = await get(tomorrowRef);
-    if(tomorrowSnap.exists() && Object.keys(tomorrowSnap.val()).length > 0){
-      await set(todayRef, tomorrowSnap.val());
+
+    if(tomorrowSnap.exists() && Object.keys(tomorrowSnap.val()).length>0){
+      await set(todayRef, tomorrowSnap.val()); // copie demain → aujourd’hui
     }
-    await set(tomorrowRef, {});
+    await set(tomorrowRef, {}); // vide demain
     await set(dateRef, todayStr);
     console.log("Dates ajustées automatiquement pour le nouveau jour :", todayStr);
   }
@@ -193,9 +192,15 @@ async function adjustDatesIfNeeded(){
 // ---------------- AFFICHER LA DATE ----------------
 function updateCurrentDate(){
   const dateDisplay = document.getElementById('current-date');
-  const baseDate = new Date();
-  if(currentDay==='tomorrow') baseDate.setDate(baseDate.getDate()+1);
-  dateDisplay.innerText = baseDate.toLocaleDateString('fr-FR', { weekday:'long', day:'2-digit', month:'long' });
+  get(ref(db,currentDay)).then(snap=>{
+    if(snap.exists() && snap.val().dateStr){
+      dateDisplay.innerText = snap.val().dateStr;
+    } else {
+      const baseDate = new Date();
+      if(currentDay==='tomorrow') baseDate.setDate(baseDate.getDate()+1);
+      dateDisplay.innerText = baseDate.toLocaleDateString('fr-FR', { weekday:'long', day:'2-digit', month:'long' });
+    }
+  });
 }
 
 // ---------------- RENDER VILLES ----------------
@@ -256,7 +261,7 @@ document.querySelectorAll('.period-btn').forEach(btn=>{
 // ---------------- DAY ----------------
 document.getElementById('day-select').addEventListener('change',(e)=>{
  currentDay = e.target.value;
- updateCurrentDate(); // MAJ date
+ updateCurrentDate(); 
  renderCities();
  loadDescription();
 });
