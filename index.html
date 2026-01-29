@@ -6,35 +6,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"/>
 <style>
-/* ---------------- BODY ---------------- */
-body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; margin:0; height:100vh; }
-
-/* ---------------- LOGIN ---------------- */
-#login-container { 
-  max-width: 400px; 
-  margin:auto; 
-  padding:20px; 
-  background:#fff; 
-  border-radius:12px; 
-  box-shadow:0 4px 12px rgba(0,0,0,0.2); 
-  text-align:center; 
-  position: relative; 
-  z-index: 10;
-  color: white;
+body::before {
+    content: "";
+    position: fixed;
+    top:0; left:0; width:100%; height:100%;
+    background: url('https://t4.ftcdn.net/jpg/07/24/00/11/360_F_724001193_eKGDuOZwvJoLt2zYHQQuFyyf2kQh7qEP.jpg') no-repeat center center;
+    background-size: cover;
+    filter: blur(15px);
+    z-index: -1;
 }
-#login-container::before {
-  content: "";
-  position: fixed;
-  top:0; left:0; right:0; bottom:0;
-  background: url('https://m.media-amazon.com/images/I/71zvVSjBE+L._AC_UF894,1000_QL80_.jpg') center/cover no-repeat;
-  filter: blur(8px) brightness(0.6);
-  z-index: -1;
+body::after {
+    content: "";
+    position: fixed;
+    top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.3);
+    z-index: -1;
+}
+body { font-family: 'Segoe UI', sans-serif; padding:20px; margin:0; }
+#login-container { 
+    max-width: 400px; 
+    margin:auto; 
+    padding:20px; 
+    background: rgba(255,255,255,0.25);
+    border-radius:12px; 
+    box-shadow:0 4px 12px rgba(0,0,0,0.2); 
+    text-align:center; 
+    position: relative; 
+    z-index: 10; 
 }
 #login-container input { margin-bottom:10px; width:100%; padding:8px; border-radius:6px; border:1px solid #ccc; }
 #login-container button { width:100%; padding:10px; border-radius:6px; }
 #login-message { display:block; margin-top:10px; color:red; font-weight:bold; }
 
-/* ---------------- TABLEAU DE BORD ---------------- */
 .container { max-width: 1200px; margin:auto; display:none; }
 .card { margin-bottom: 20px; }
 .card-header { font-weight:bold; font-size:1.1rem; }
@@ -43,7 +46,6 @@ body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; 
 </head>
 <body>
 
-<!-- ---------------- LOGIN ---------------- -->
 <div id="login-container">
   <h3>🌩️ Connexion Prévisions</h3>
   <input type="email" id="login-email" placeholder="Email" />
@@ -52,18 +54,13 @@ body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; 
   <span id="login-message"></span>
 </div>
 
-<!-- ---------------- TABLEAU DE BORD ---------------- -->
 <div class="container">
-<h1 class="mb-4">Tableau de bord prévisions - MeteoAveyron - OBserveV2</h1>
+<h1 class="mb-4">Tableau de bord prévisions - MeteoAveyron</h1>
 
 <div class="card">
-<div class="card-header">Sélection du jour</div>
+<div class="card-header">Sélection de la date</div>
 <div class="card-body d-flex align-items-center gap-3">
-<select id="day-select" class="form-select w-25">
-<option value="today">Aujourd'hui</option>
-<option value="tomorrow">Demain</option>
-</select>
-<button id="update-map" class="btn btn-primary">Mettre à jour la carte</button>
+<input type="date" id="date-select" class="form-control w-25"/>
 <span id="current-date" class="ms-3 fw-bold"></span>
 </div>
 </div>
@@ -74,16 +71,14 @@ body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; 
 <button class="btn btn-primary period-btn" data-period="morning">Matin</button>
 <button class="btn btn-primary period-btn" data-period="day">Journée</button>
 <button class="btn btn-primary period-btn" data-period="evening">Soirée</button>
-<button class="btn btn-warning period-btn" data-period="wind">Vent</button>
+<button class="btn btn-warning period-btn" data-period="wind">Prévision vent</button>
 </div>
 </div>
 
 <div class="card">
 <div class="card-header">Conditions météo</div>
 <div class="card-body">
-<div class="row g-3" id="cities-container">
-<!-- Les villes seront injectées ici -->
-</div>
+<div class="row g-3" id="cities-container"></div>
 </div>
 </div>
 
@@ -91,18 +86,17 @@ body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; 
 <div class="card-header">Description</div>
 <div class="card-body">
 <textarea id="description-text" class="form-control" rows="4"></textarea>
-<button id="save-description" class="btn btn-success mt-2">Sauvegarder la description</button>
 </div>
 </div>
 
+<button id="save-all" class="btn btn-success mt-3">Sauvegarder</button>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-database.js";
+import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-auth.js";
 
-// ---------------- FIREBASE ----------------
 const firebaseConfig = {
  apiKey: "AIzaSyCpWWE-v4vAiQt4P-eogE7sUZ3WGODSPj4",
  authDomain: "previsions-meteo.firebaseapp.com",
@@ -116,182 +110,179 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
+// ---------------- DONNÉES ----------------
+const CONDITIONS = {
+ soleil:{label:"Ensoleillé",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/soleil-high-5ydohv.png"},
+ nuageux:{label:"Nuageux",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/nuageux-high-nctmr4.png"},
+ pluie_faible:{label:"Pluie faible",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/pluie-faible-high-lwo4k5.png"},
+ vent_faible:{label:"Vent faible",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/logo_initiale_marron-_gourmand_-l-gant_minimaliste-removebg-preview-high.png"}
+};
+const CITIES = ["Rodez","Millau","Decazeville","Villefranche-de-Rouergue"];
+let currentPeriod = "morning";
+let currentDate = new Date().toISOString().split("T")[0];
+const tempData = {}; // stockage temporaire
+
 // ---------------- LOGIN ----------------
 const loginBtn = document.getElementById('login-btn');
 const loginMessage = document.getElementById('login-message');
 loginBtn.addEventListener('click', async () => {
   const email = document.getElementById('login-email').value;
   const password = document.getElementById('login-password').value;
-
   try {
     await signInWithEmailAndPassword(auth, email, password);
     loginMessage.innerText = "Connecté !";
     document.getElementById('login-container').style.display = 'none';
     document.querySelector('.container').style.display = 'block';
-    await adjustDatesIfNeeded(); 
-    renderCities();
-    loadDescription();
-    updateCurrentDate(); 
+    await initializeDashboard();
   } catch(error) {
     loginMessage.innerText = "Erreur : " + error.message;
   }
 });
 
-// ---------------- DONNÉES ----------------
-const CONDITIONS = {
- soleil:{label:"Ensoleillé",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/soleil-high-5ydohv.png"},
- soleil_nuages:{label:"Ensoleillé avec nuages possibles",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/soleil-et-nuage-high.png?enable-io=true&width=532"},
- eclaircies:{label:"éclaircies possibles",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/eclaircies-high.png?enable-io=true&width=532"},
- nuageux:{label:"Nuageux",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/nuageux-high-nctmr4.png?enable-io=true&width=532"},
- averses_localisées:{label:"Averses Localisées",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/passages-pluvieux-high-qpysrh.png?enable-io=true&width=532"},
- pluie_faible:{label:"Pluie faible",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/pluie-faible-high-lwo4k5.png"},
- pluie_moderee:{label:"Pluie modérée",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/pluie-mod-r-high-omk8vs.png"},
- pluie_forte:{label:"Forte pluie ⚠️",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/pluie-forte-high.png?enable-io=true&width=532"},
- orage:{label:"Orages possibles",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/orage-high-2ijlyg.png"},
- orage_isolé:{label:"Risque d'orages isolées",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/passages-orageux-high-6ppgfs.png?enable-io=true&width=532"},
- orage_violent:{label:"Risque d'orages violents ⚠️",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/orage-fort-high.png?enable-io=true&width=532"},
- neige_localisée:{label:"Neige localisée",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/neige-claircies-high-ajzfn1.png?enable-io=true&width=532"},
- neige_faible:{label:"Faibles chutes de neige",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/neige-faible-high-goeaq0.png?enable-io=true&width=532"},
- neige_modéré:{label:"Chutes de neige modérées",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/neige-mod-r-high-hw687j.png?enable-io=true&width=532"},
- neige_forte:{label:"Fortes chutes de neige ⚠️",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/neige-forte-high.png?enable-io=true&width=532"},
- pluie_neige:{label:"Pluies et neige mêlées",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/copie_de_copie_de_aesthetic_phone_mockup_instagram_post__9_-removebg-preview-high.png?enable-io=true&width=532"},
- brouillard_givrant_possible:{label:"Brouillard givrant possible ⚠️",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/copie_de_copie_de_aesthetic_phone_mockup_instagram_post__12_-removebg-preview-high.png?enable-io=true&width=532"},
- brouillard_givrant:{label:"Brouillard givrant ⚠️",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/copie_de_copie_de_aesthetic_phone_mockup_instagram_post__5_-removebg-preview-high.png?enable-io=true&width=532"},
- brouillard:{label:"Brouillard possible",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/brouillard-high.png?enable-io=true&crop=1.4577%3A1%2Coffset-y55&width=532"},
- vent_faible:{label:"Vent faible",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/logo_initiale_marron-_gourmand_-l-gant_minimaliste-removebg-preview-high.png"},
- vent_modere:{label:"Vent modéré",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/logo_initiale_marron-_gourmand_-l-gant_minimaliste__1_-removebg-preview-high-062t0p.png"},
- vent_fort:{label:"Vent fort",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/logo_initiale_marron-_gourmand_-l-gant_minimaliste__2_-removebg-preview-removebg-preview-high.png"},
- vent_tres_fort:{label:"Vent très fort",icon:"https://primary.jwwb.nl/public/q/t/q/temp-uozhroxmecrdemnjgoky/logo_initiale_marron-_gourmand_-l-gant_minimaliste__3_-removebg-preview-high.png"}
-};
-
-const CITIES = ["Rodez","Millau","Decazeville","Villefranche-de-Rouergue"];
-let currentPeriod = "morning";
-let currentDay = "today";
-
-// ---------------- AJUSTER LES DATES À MINUIT ----------------
-async function adjustDatesIfNeeded(){
-  // Simuler la date du jour pour tests : const todayStr = "2026-01-28";
-  const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-  const dateRef = ref(db,'dateReference');
-  const snap = await get(dateRef);
-
-  if(!snap.exists() || snap.val()!==todayStr){
-    const todayRef = ref(db,'today');
-    const tomorrowRef = ref(db,'tomorrow');
-    const tomorrowSnap = await get(tomorrowRef);
-
-    if(tomorrowSnap.exists() && Object.keys(tomorrowSnap.val()).length>0){
-      await set(todayRef, tomorrowSnap.val()); // copie demain → aujourd’hui
+// ---------------- INITIALISATION ----------------
+async function initializeDashboard(){
+    // récupérer displayedDay depuis Firebase
+    const displayedSnap = await get(ref(db,'displayedDay'));
+    if(displayedSnap.exists()){
+        currentDate = displayedSnap.val();
     }
-    await set(tomorrowRef, {}); // vide demain
-    await set(dateRef, todayStr);
-    console.log("Dates ajustées automatiquement pour le nouveau jour :", todayStr);
-  }
+
+    const dateInput = document.getElementById('date-select');
+    dateInput.value = currentDate;
+    updateCurrentDateDisplay();
+
+    // Charger toutes les données existantes pour cette date
+    await loadAllDataForDate(currentDate);
+
+    dateInput.addEventListener('change',()=> {
+        currentDate = dateInput.value;
+        renderCities();
+        loadDescription();
+        updateCurrentDateDisplay();
+    });
+
+    document.querySelectorAll('.period-btn').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+            saveCurrentDescription();
+            document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('btn-success'));
+            btn.classList.add('btn-success');
+            currentPeriod = btn.dataset.period;
+            renderCities();
+            loadDescription();
+        });
+    });
+
+    renderCities();
+    loadDescription();
+
+    document.getElementById('save-all').addEventListener('click', saveAll);
 }
 
-// ---------------- AFFICHER LA DATE ----------------
-function updateCurrentDate(){
-  const dateDisplay = document.getElementById('current-date');
-  get(ref(db,currentDay)).then(snap=>{
-    if(snap.exists() && snap.val().dateStr){
-      dateDisplay.innerText = snap.val().dateStr;
-    } else {
-      const baseDate = new Date();
-      if(currentDay==='tomorrow') baseDate.setDate(baseDate.getDate()+1);
-      dateDisplay.innerText = baseDate.toLocaleDateString('fr-FR', { weekday:'long', day:'2-digit', month:'long' });
-    }
-  });
+// ---------------- AFFICHER DATE ----------------
+function updateCurrentDateDisplay(){
+    const dateDisplay = document.getElementById('current-date');
+    const d = new Date(currentDate);
+    dateDisplay.innerText = d.toLocaleDateString('fr-FR', { weekday:'long', day:'2-digit', month:'long' });
 }
 
 // ---------------- RENDER VILLES ----------------
 const container = document.getElementById('cities-container');
 function renderCities(){
- container.innerHTML = '';
+ container.innerHTML='';
  CITIES.forEach(city=>{
+  if(!tempData[currentDate]) tempData[currentDate]={};
+  if(!tempData[currentDate][currentPeriod]) tempData[currentDate][currentPeriod]={};
+  if(!tempData[currentDate][currentPeriod][city]) tempData[currentDate][currentPeriod][city]={condition:'soleil'};
+
   const col = document.createElement('div');
-  col.className = 'col-md-3';
-  col.innerHTML = `<div class="card p-2">
+  col.className='col-md-3';
+  col.innerHTML=`<div class="card p-2">
    <div class="mb-2"><strong>${city}</strong></div>
    <select class="form-select condition-select"></select>
    <img class="icon-preview mt-2" src="" alt="icône"/>
-   <button class="btn btn-success btn-sm mt-2 save-btn">Sauvegarder</button>
   </div>`;
   container.appendChild(col);
+
   const select = col.querySelector('.condition-select');
   const img = col.querySelector('.icon-preview');
-  const saveBtn = col.querySelector('.save-btn');
 
   Object.keys(CONDITIONS).forEach(key=>{
    const opt = document.createElement('option');
-   opt.value = key; opt.text = CONDITIONS[key].label;
+   opt.value=key; opt.text=CONDITIONS[key].label;
    select.appendChild(opt);
   });
 
-  const cityRef = ref(db, `${currentDay}/${currentPeriod}/${city}`);
-  onValue(cityRef, snap=>{
-   if(snap.exists()){
-    select.value = snap.val();
-    img.src = CONDITIONS[snap.val()].icon;
-   } else {
-    select.value = currentPeriod.includes('vent')?'vent_faible':'soleil';
-    img.src = CONDITIONS[select.value].icon;
-   }
-  });
+  select.value = tempData[currentDate][currentPeriod][city].condition;
+  img.src = CONDITIONS[select.value].icon;
 
-  select.addEventListener('change',()=>{ img.src = CONDITIONS[select.value].icon; });
-
-  saveBtn.addEventListener('click',()=>{ 
-   set(ref(db, `${currentDay}/${currentPeriod}/${city}`), select.value); 
-   alert(`${city} - ${currentPeriod} (${currentDay}) mis à jour !`); 
+  select.addEventListener('change',()=>{
+      tempData[currentDate][currentPeriod][city].condition = select.value;
+      img.src = CONDITIONS[select.value].icon;
   });
- });
+});
 }
-
-// ---------------- PERIODES ----------------
-document.querySelectorAll('.period-btn').forEach(btn=>{
- btn.addEventListener('click',()=>{
-  document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('btn-success')); 
-  btn.classList.add('btn-success');
-  currentPeriod = btn.dataset.period;
-  renderCities();
-  loadDescription();
- });
-});
-
-// ---------------- DAY ----------------
-document.getElementById('day-select').addEventListener('change',(e)=>{
- currentDay = e.target.value;
- updateCurrentDate(); 
- renderCities();
- loadDescription();
-});
 
 // ---------------- DESCRIPTION ----------------
 const descTextarea = document.getElementById('description-text');
 function loadDescription(){
- const descRef = ref(db, `descriptions/${currentDay}/${currentPeriod}`);
- onValue(descRef, snap=>{ descTextarea.value = snap.exists()? snap.val() : ''; });
-}
-document.getElementById('save-description').addEventListener('click',()=>{
- set(ref(db, `descriptions/${currentDay}/${currentPeriod}`), descTextarea.value);
- alert(`Description ${currentPeriod} pour ${currentDay} mise à jour !`);
-});
+    if(!tempData[currentDate]) tempData[currentDate]={};
+    if(!tempData[currentDate][currentPeriod]) tempData[currentDate][currentPeriod]={};
+    if(!tempData[currentDate][currentPeriod].text) tempData[currentDate][currentPeriod].text = '';
 
-// ---------------- BOUTON METTRE À JOUR CARTE ----------------
-const updateBtn = document.getElementById('update-map');
-updateBtn.addEventListener('click', async ()=>{
- const displayedRef = ref(db,'displayedDay');
- const snap = await get(displayedRef);
- const currentDisplayed = snap.exists()? snap.val():'today';
- if(currentDisplayed==='today'){
-   await set(displayedRef,'tomorrow');
-   updateBtn.textContent = "Revenir au jour j";
- } else {
-   await set(displayedRef,'today');
-   updateBtn.textContent = "Mettre à jour la carte";
- }
- alert("Carte publique mise à jour !");
-});
+    descTextarea.value = tempData[currentDate][currentPeriod].text;
+
+    descTextarea.oninput = ()=>{
+        tempData[currentDate][currentPeriod].text = descTextarea.value;
+    };
+}
+
+// ---------------- CHARGER TOUTES LES DONNÉES EXISTANTES ----------------
+async function loadAllDataForDate(date){
+    for(const period of ['morning','day','evening','wind']){
+        for(const city of CITIES){
+            const snap = await get(ref(db, `${date}/${period}/${city}`));
+            if(snap.exists()){
+                if(!tempData[date]) tempData[date]={};
+                if(!tempData[date][period]) tempData[date][period]={};
+                if(!tempData[date][period][city]) tempData[date][period][city]={};
+                tempData[date][period][city].condition = snap.val();
+            }
+        }
+        const descSnap = await get(ref(db, `descriptions/${date}/${period}`));
+        if(descSnap.exists()){
+            if(!tempData[date]) tempData[date]={};
+            if(!tempData[date][period]) tempData[date][period]={};
+            tempData[date][period].text = descSnap.val();
+        }
+    }
+}
+
+// ---------------- SAUVEGARDE ----------------
+function saveCurrentDescription(){
+    tempData[currentDate][currentPeriod].text = descTextarea.value;
+}
+
+async function saveAll(){
+    saveCurrentDescription();
+    if(!tempData[currentDate]) return;
+
+    ['morning','day','evening','wind'].forEach(period=>{
+        CITIES.forEach(city=>{
+            if(tempData[currentDate][period] && tempData[currentDate][period][city]){
+                set(ref(db, `${currentDate}/${period}/${city}`), tempData[currentDate][period][city].condition);
+            }
+        });
+    });
+
+    ['morning','day','evening','wind'].forEach(period=>{
+        if(tempData[currentDate][period] && tempData[currentDate][period].text){
+            set(ref(db, `descriptions/${currentDate}/${period}`), tempData[currentDate][period].text);
+        }
+    });
+
+    set(ref(db,'displayedDay'), currentDate);
+    alert(`Prévisions pour ${currentDate} sauvegardées !`);
+}
 </script>
 </body>
 </html>
